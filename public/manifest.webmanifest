@@ -1,0 +1,9 @@
+{
+  "name": "Presidio Web",
+  "short_name": "Presidio",
+  "description": "Local-first PII detection and redaction",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1410",
+  "theme_color": "#101713"
+}
