@@ -134,7 +134,9 @@ GitHub Pages cannot provide custom COOP/COEP response headers. Consequently, the
 
 - `src/workers/analyzer.worker.ts` — Presidio, GLiNER, model installation, ONNX execution, and merge pipeline
 - `src/lib/demo-vault.ts` — distinct-value normalization and opaque demo identity assignment
-- `src/app/page.tsx` — review, model controls, status UI, redacted output, and vault inspector
+- `src/app/page.tsx` — minimal project landing page
+- `src/app/docs/page.tsx` — package and architecture documentation
+- `src/app/demo/page.tsx` — review, model controls, status UI, redacted output, and vault inspector
 - `public/ort/` — self-hosted ONNX Runtime Web WASM binaries
 - `public/sw.js` — application-shell caching
 
