@@ -34,6 +34,8 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: /presidio-web-demo
         run: pnpm build
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out
