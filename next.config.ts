@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const isStaticExport = process.env.STATIC_EXPORT === "true";
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
+const serverHeaders: Pick<NextConfig, "headers"> = isStaticExport ? {} : {
   async headers() {
     return [{
       source: "/:path*",
@@ -11,6 +14,15 @@ const nextConfig: NextConfig = {
       ],
     }];
   },
+};
+
+const nextConfig: NextConfig = {
+  ...(isStaticExport ? { output: "export" as const } : {}),
+  ...serverHeaders,
+  basePath,
+  assetPrefix: basePath || undefined,
+  trailingSlash: isStaticExport,
+  images: { unoptimized: true },
 };
 
 export default nextConfig;

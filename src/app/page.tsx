@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DemoVaultEntry, indexFindings, shortVaultId } from "../lib/demo-vault";
 
 type Finding = {
   entityType: string;
@@ -8,6 +9,7 @@ type Finding = {
   end: number;
   score: number;
   analysisExplanation?: { recognizer?: string };
+  vaultId?: string;
 };
 
 type ModelState = {
@@ -16,19 +18,26 @@ type ModelState = {
   usage: number;
   quota: number;
   persistent: boolean;
+  runtimeReady: boolean;
+  backend: string;
 };
 
 const formatBytes = (bytes: number) => {
   if (!bytes) return "0 MB";
   return `${(bytes / 1024 / 1024).toFixed(bytes > 100 * 1024 * 1024 ? 0 : 1)} MB`;
 };
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 const SAMPLE = `Patient Sarah Connor called from +1 415-555-2671.
 Her bank transfer used IBAN DE89370400440532013000.
+Sarah Connor confirmed the same callback number: +1 415-555-2671.
 Backup card: 4111 1111 1111 1111. Email: sarah.connor@example.com.`;
 
 export default function Home() {
   const worker = useRef<Worker | null>(null);
+  const requestId = useRef(0);
+  const analyzedText = useRef(SAMPLE);
+  const vaultIdentities = useRef(new Map<string, DemoVaultEntry>());
   const [text, setText] = useState(SAMPLE);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [elapsed, setElapsed] = useState<number | null>(null);
@@ -36,7 +45,11 @@ export default function Home() {
   const [workerReady, setWorkerReady] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
   const [webGpu, setWebGpu] = useState(false);
-  const [model, setModel] = useState<ModelState>({ installed: false, bytes: 0, usage: 0, quota: 0, persistent: false });
+  const [model, setModel] = useState<ModelState>({ installed: false, bytes: 0, usage: 0, quota: 0, persistent: false, runtimeReady: false, backend: "" });
+  const [useGliner, setUseGliner] = useState(false);
+  const [inference, setInference] = useState({ phase: "idle", message: "Pattern engine ready", backend: "" });
+  const [counts, setCounts] = useState({ patterns: 0, gliner: 0 });
+  const [vaultEntries, setVaultEntries] = useState<DemoVaultEntry[]>([]);
   const [modelProgress, setModelProgress] = useState<{ downloaded: number; total: number; file: string } | null>(null);
   const [modelError, setModelError] = useState("");
 
@@ -51,8 +64,12 @@ export default function Home() {
         instance.postMessage({ type: "model-status" });
       }
       if (event.data.type === "result") {
-        setFindings(event.data.findings);
+        if (event.data.requestId !== requestId.current) return;
+        const indexed = indexFindings(analyzedText.current, event.data.findings, vaultIdentities.current);
+        setFindings(indexed.findings);
+        setVaultEntries(indexed.entries);
         setElapsed(event.data.elapsedMs);
+        setCounts({ patterns: event.data.patternCount, gliner: event.data.glinerCount });
         setBusy(false);
       }
       if (event.data.type === "model-status") {
@@ -60,15 +77,17 @@ export default function Home() {
         setModelProgress(null);
       }
       if (event.data.type === "model-progress") setModelProgress(event.data);
+      if (event.data.type === "inference-status") setInference(event.data);
       if (event.data.type === "model-error") {
         setModelError(event.data.message);
         setModelProgress(null);
+        setBusy(false);
       }
     };
     worker.current = instance;
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").then(() => setOfflineReady(true)).catch(() => {});
+      navigator.serviceWorker.register(`${BASE_PATH}/sw.js`, { scope: `${BASE_PATH}/` }).then(() => setOfflineReady(true)).catch(() => {});
     }
     return () => instance.terminate();
   }, []);
@@ -76,7 +95,9 @@ export default function Home() {
   const analyze = () => {
     if (!worker.current || !workerReady) return;
     setBusy(true);
-    worker.current.postMessage({ type: "analyze", text });
+    const nextRequest = ++requestId.current;
+    analyzedText.current = text;
+    worker.current.postMessage({ type: "analyze", text, useGliner, requestId: nextRequest });
   };
 
   const installModel = async () => {
@@ -88,7 +109,8 @@ export default function Home() {
   const redacted = useMemo(() => {
     let output = text;
     for (const item of [...findings].sort((a, b) => b.start - a.start)) {
-      output = `${output.slice(0, item.start)}[${item.entityType}]${output.slice(item.end)}`;
+      const token = item.vaultId ? `{{${item.vaultId}}}` : `[${item.entityType}]`;
+      output = `${output.slice(0, item.start)}${token}${output.slice(item.end)}`;
     }
     return output;
   }, [text, findings]);
@@ -112,7 +134,7 @@ export default function Home() {
         <span><i className={workerReady ? "ok" : ""} /> Analysis worker</span>
         <span><i className={offlineReady ? "ok" : ""} /> Offline shell</span>
         <span><i className={webGpu ? "ok" : "warn"} /> {webGpu ? "WebGPU available" : "WASM fallback"}</span>
-        <span className="ml-status">GLiNER · {model.installed ? "stored offline" : "not installed"}</span>
+        <span className={`ml-status ${busy || inference.phase === "loading" ? "active" : ""}`}><i className={inference.phase === "error" ? "error" : model.runtimeReady ? "ok" : model.installed ? "warn" : ""} /> GLiNER · {busy && useGliner ? "working" : model.runtimeReady ? `ready · ${model.backend || inference.backend}` : model.installed ? "stored offline" : "not installed"}</span>
       </section>
 
       <section className="model-card">
@@ -133,6 +155,11 @@ export default function Home() {
           {model.installed && <button onClick={() => worker.current?.postMessage({ type: "remove-model" })}>Remove downloaded model</button>}
           <span>Stored only for this origin · removable at any time</span>
         </div>
+        <label className={`model-toggle ${!model.installed ? "disabled" : ""}`}>
+          <span><strong>Use GLiNER enhanced detection</strong><small>{model.installed ? inference.message : "Install the model to enable semantic detection"}</small></span>
+          <input type="checkbox" checked={useGliner} disabled={!model.installed || busy} onChange={(event) => setUseGliner(event.target.checked)} />
+          <i aria-hidden="true" />
+        </label>
       </section>
 
       <section className="workspace">
@@ -141,17 +168,17 @@ export default function Home() {
           <textarea value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} aria-label="Text to analyze" />
           <div className="actions">
             <button className="primary" onClick={analyze} disabled={!workerReady || busy}>{busy ? "Scanning…" : "Scan locally"}</button>
-            <button onClick={() => { setText(SAMPLE); setFindings([]); }}>Load sample</button>
-            <label className="file-button">Open file<input type="file" accept=".txt,.md,.json,.csv,text/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) { setText(await file.text()); setFindings([]); } }} /></label>
+            <button onClick={() => { setText(SAMPLE); setFindings([]); setVaultEntries([]); }}>Load sample</button>
+            <label className="file-button">Open file<input type="file" accept=".txt,.md,.json,.csv,text/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) { setText(await file.text()); setFindings([]); setVaultEntries([]); } }} /></label>
           </div>
         </article>
 
         <article className="panel findings-panel">
-          <div className="panel-head"><div><small>02</small><h2>Findings</h2></div><span>{findings.length} detected</span></div>
+          <div className="panel-head"><div><small>02</small><h2>Findings</h2></div><span>{findings.length} detected{findings.length > 0 && ` · ${counts.patterns} rules + ${counts.gliner} ML`}</span></div>
           <div className="finding-list">
             {findings.length === 0 ? <p className="empty">Run a scan to inspect locally detected PII.</p> : findings.map((item, index) => (
               <div className="finding" key={`${item.start}-${item.end}-${index}`}>
-                <div><strong>{item.entityType.replaceAll("_", " ")}</strong><code>{text.slice(item.start, item.end)}</code></div>
+                <div><strong>{item.entityType.replaceAll("_", " ")}</strong><code>{text.slice(item.start, item.end)}</code>{item.vaultId && <span className="vault-ref">{shortVaultId(item.vaultId)}</span>}</div>
                 <div className="score">{Math.round(item.score * 100)}%<small>{item.analysisExplanation?.recognizer ?? "Presidio"}</small></div>
               </div>
             ))}
@@ -163,9 +190,22 @@ export default function Home() {
           <pre>{redacted}</pre>
           <div className="actions"><button onClick={() => navigator.clipboard.writeText(redacted)} disabled={!findings.length}>Copy redacted text</button></div>
         </article>
+
+        <article className="panel vault-panel">
+          <div className="panel-head"><div><small>04</small><h2>Local identity vault</h2></div><span>{vaultEntries.length} distinct values</span></div>
+          <div className="vault-list">
+            {vaultEntries.length === 0 ? <p className="empty">Run a scan to assign stable, reusable demo identities.</p> : vaultEntries.map((entry) => (
+              <div className="vault-entry" key={entry.id}>
+                <div><strong>{entry.entityType.replaceAll("_", " ")}</strong><code>{entry.originalValue}</code></div>
+                <div><span>{shortVaultId(entry.id)}</span><small>{entry.occurrences} occurrence{entry.occurrences === 1 ? "" : "s"}</small></div>
+              </div>
+            ))}
+          </div>
+          <p className="vault-note">Demo-only in-memory index. IDs are random and reused for exact normalized values during this browser session.</p>
+        </article>
       </section>
 
-      <footer><strong>presidio-web</strong><span>Pattern detection runs now. OPFS model installation is ready; GLiNER inference wiring comes next.</span></footer>
+      <footer><strong>presidio-web</strong><span>Hybrid Presidio + GLiNER analysis runs entirely inside a dedicated browser worker.</span></footer>
     </main>
   );
 }
