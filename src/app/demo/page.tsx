@@ -93,6 +93,18 @@ export default function Home() {
     return () => instance.terminate();
   }, []);
 
+  useEffect(() => {
+    if (inference.phase !== "complete") return;
+    const timeout = window.setTimeout(() => {
+      setInference({
+        phase: model.runtimeReady ? "ready" : "idle",
+        message: model.runtimeReady ? `GLiNER ready on ${model.backend || inference.backend}` : "Pattern engine ready",
+        backend: model.backend || inference.backend,
+      });
+    }, 2500);
+    return () => window.clearTimeout(timeout);
+  }, [inference.phase, inference.backend, model.runtimeReady, model.backend]);
+
   const analyze = () => {
     if (!worker.current || !workerReady) return;
     setBusy(true);
@@ -100,6 +112,14 @@ export default function Home() {
     analyzedText.current = text;
     worker.current.postMessage({ type: "analyze", text, useGliner, requestId: nextRequest });
   };
+
+  const scanLabel = !busy
+    ? "Scan locally"
+    : inference.phase === "loading"
+      ? "Preparing GLiNER…"
+      : inference.phase === "finalizing"
+        ? "Finalizing findings…"
+        : "Running local detection…";
 
   const installModel = async () => {
     setModelError("");
@@ -132,7 +152,7 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="statusbar" aria-label="Runtime status">
+      <section className="statusbar" aria-label="Runtime status" aria-live="polite">
         <span><i className={workerReady ? "ok" : ""} /> Analysis worker</span>
         <span><i className={offlineReady ? "ok" : ""} /> Offline shell</span>
         <span><i className={webGpu ? "ok" : "warn"} /> {webGpu ? "WebGPU available" : "WASM fallback"}</span>
@@ -169,16 +189,20 @@ export default function Home() {
           <div className="panel-head"><div><small>01</small><h2>Source text</h2></div><span>{text.length.toLocaleString()} chars</span></div>
           <textarea value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} aria-label="Text to analyze" />
           <div className="actions">
-            <button className="primary" onClick={analyze} disabled={!workerReady || busy}>{busy ? "Scanning…" : "Scan locally"}</button>
+            <button className={`primary scan-button ${busy ? "busy" : ""}`} onClick={analyze} disabled={!workerReady || busy} aria-busy={busy}>
+              {busy && <span className="spinner" aria-hidden="true" />}{scanLabel}
+            </button>
             <button onClick={() => { setText(SAMPLE); setFindings([]); setVaultEntries([]); }}>Load sample</button>
             <label className="file-button">Open file<input type="file" accept=".txt,.md,.json,.csv,text/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file) { setText(await file.text()); setFindings([]); setVaultEntries([]); } }} /></label>
           </div>
         </article>
 
-        <article className="panel findings-panel">
+        <article className="panel findings-panel" aria-busy={busy}>
           <div className="panel-head"><div><small>02</small><h2>Findings</h2></div><span>{findings.length} detected{findings.length > 0 && ` · ${counts.patterns} rules + ${counts.gliner} ML`}</span></div>
-          <div className="finding-list">
-            {findings.length === 0 ? <p className="empty">Run a scan to inspect locally detected PII.</p> : findings.map((item, index) => (
+          {busy && <div className="inference-progress" aria-hidden="true"><span /></div>}
+          <div className={`finding-list ${busy && findings.length ? "updating" : ""}`}>
+            {busy && findings.length > 0 && <div className="updating-label"><span className="spinner" aria-hidden="true" />Updating locally…</div>}
+            {findings.length === 0 ? <p className="empty" role="status" aria-live="polite">{busy ? (useGliner ? "GLiNER is analyzing this text locally…" : "Analyzing this text locally…") : "Run a scan to inspect locally detected PII."}</p> : findings.map((item, index) => (
               <div className="finding" key={`${item.start}-${item.end}-${index}`}>
                 <div><strong>{item.entityType.replaceAll("_", " ")}</strong><code>{text.slice(item.start, item.end)}</code>{item.vaultId && <span className="vault-ref">{shortVaultId(item.vaultId)}</span>}</div>
                 <div className="score">{Math.round(item.score * 100)}%<small>{item.analysisExplanation?.recognizer ?? "Presidio"}</small></div>

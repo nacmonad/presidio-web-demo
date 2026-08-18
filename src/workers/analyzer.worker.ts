@@ -174,8 +174,10 @@ async function analyze(text: string, useGliner: boolean, requestId: number) {
     const entities = await gliner!.detect(text, GLINER_LABELS, { threshold: 0.5 });
     semantic = entities.map((item) => ({ entityType: LABEL_MAP[item.label] ?? item.label.toUpperCase().replaceAll(" ", "_"), start: item.start, end: item.end, score: item.score, analysisExplanation: { recognizer: "GLiNER" } }));
   }
-  self.postMessage({ type: "result", requestId, findings: mergeFindings(patterns, semantic), patternCount: patterns.length, glinerCount: semantic.length, elapsedMs: performance.now() - started, backend });
-  self.postMessage({ type: "inference-status", phase: gliner ? "ready" : "idle", message: gliner ? `GLiNER ready on ${backend}` : "Pattern engine ready", backend });
+  self.postMessage({ type: "inference-status", phase: "finalizing", message: "Finalizing findings…", backend });
+  const elapsedMs = performance.now() - started;
+  self.postMessage({ type: "result", requestId, findings: mergeFindings(patterns, semantic), patternCount: patterns.length, glinerCount: semantic.length, elapsedMs, backend });
+  self.postMessage({ type: "inference-status", phase: "complete", message: `Scan complete · ${(elapsedMs / 1000).toFixed(1)}s${backend ? ` · ${backend}` : ""}`, backend });
 }
 
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
