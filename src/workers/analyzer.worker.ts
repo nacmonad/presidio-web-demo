@@ -9,6 +9,7 @@ import {
   RecognizerRegistry,
   type OnnxSession,
 } from "presidio-web";
+import { expandSemanticOccurrences } from "../lib/semantic-occurrences";
 
 const recognizers = [
   new IbanRecognizer(),
@@ -173,6 +174,8 @@ async function analyze(text: string, useGliner: boolean, requestId: number) {
     await loadGliner();
     const entities = await gliner!.detect(text, GLINER_LABELS, { threshold: 0.5 });
     semantic = entities.map((item) => ({ entityType: LABEL_MAP[item.label] ?? item.label.toUpperCase().replaceAll(" ", "_"), start: item.start, end: item.end, score: item.score, analysisExplanation: { recognizer: "GLiNER" } }));
+    const acceptedSemantic = mergeFindings(patterns, semantic).filter((item) => item.analysisExplanation?.recognizer === "GLiNER");
+    semantic = expandSemanticOccurrences(text, acceptedSemantic);
   }
   self.postMessage({ type: "inference-status", phase: "finalizing", message: "Finalizing findings…", backend });
   const elapsedMs = performance.now() - started;
