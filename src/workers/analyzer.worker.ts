@@ -32,6 +32,8 @@ const MODEL_VERSION = "fp32-v1";
 const MODEL_FILES = ["gliner_config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "onnx/model.onnx"] as const;
 const MODEL_BASE = "https://huggingface.co/knowledgator/gliner-pii-edge-v1.0/resolve/main";
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const ORT_VERSION = "1.27.0";
+const ORT_WASM_PATH = new URL(`${BASE_PATH}/ort/${ORT_VERSION}/`, self.location.origin).href;
 const GLINER_LABELS = ["person", "organization", "location", "address", "date of birth", "medical record number", "username", "passport number", "social security number"];
 const LABEL_MAP: Record<string, string> = {
   person: "PERSON", organization: "ORGANIZATION", location: "LOCATION", address: "ADDRESS",
@@ -130,7 +132,10 @@ async function loadGliner() {
     ]);
     const tokenizer = new PreTrainedTokenizer(JSON.parse(await tokenizerFile.text()), JSON.parse(await configFile.text()));
     const modelBytes = new Uint8Array(await modelFile.arrayBuffer());
-    ort.env.wasm.wasmPaths = `${BASE_PATH}/ort/`;
+    // ONNX Runtime requires overrides to be absolute. Keeping the package version in the
+    // public path also prevents an older service-worker-cached binary from being paired with
+    // the current JavaScript bundle.
+    ort.env.wasm.wasmPaths = ORT_WASM_PATH;
     ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.max(1, Math.min(4, navigator.hardwareConcurrency || 1)) : 1;
     let session: ort.InferenceSession;
     try {
@@ -180,8 +185,9 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     else if (event.data.type === "install-model") await installModel();
     else if (event.data.type === "remove-model") await removeModel();
   } catch (error) {
-    self.postMessage({ type: "model-error", message: error instanceof Error ? error.message : String(error) });
-    self.postMessage({ type: "inference-status", phase: "error", message: "GLiNER failed", backend });
+    const message = error instanceof Error ? error.message : String(error);
+    self.postMessage({ type: "model-error", message });
+    self.postMessage({ type: "inference-status", phase: "error", message: `GLiNER failed: ${message}`, backend });
   }
 };
 
