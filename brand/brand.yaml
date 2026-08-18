@@ -1,0 +1,28 @@
+schema_version: 1
+slug: presidio-web
+name: Presidio Web
+one_liner: Private PII detection and redaction, entirely in your browser.
+tagline: "Presidio, right in your browser."
+archetype: "Sage"
+status: draft
+stage: "early public demo"
+industry: "privacy engineering and developer tooling"
+languages: [en]
+links:
+  domain: "https://nacmonad.github.io/presidio-web-demo/"
+  repo: "https://github.com/nacmonad/presidio-web-demo"
+created: 2026-08-18
+updated: 2026-08-18
+version: 1
+artifacts:
+  context: true
+  naming: false
+  strategy: false
+  architecture: false
+  identity: true
+  voice: false
+  messaging: true
+  positioning: true
+  story: false
+  guidelines: false
+  audit: false
