@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { BrandMark } from "@/components/brand-mark";
 import { DemoVaultEntry, indexFindings, shortVaultId } from "../../lib/demo-vault";
 
 type Finding = {
@@ -119,7 +120,8 @@ export default function Home() {
     <main>
       <header className="hero">
         <div>
-          <p className="eyebrow">PRESIDIO, WITHOUT THE SERVER</p>
+          <div className="demo-brand"><BrandMark size={34} /><span>Presidio Web</span></div>
+          <p className="eyebrow">PRESIDIO, RIGHT IN YOUR BROWSER</p>
           <h1>Find sensitive data<br />before it leaves your browser.</h1>
           <p className="lede">A browser-native, mechanically verified port of Microsoft Presidio. Your document stays on this device.</p>
         </div>

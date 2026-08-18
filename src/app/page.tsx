@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 
 export default function Home() {
   return (
     <main className="landing">
-      <div className="landing-mark" aria-hidden="true">P</div>
+      <BrandMark className="landing-mark" size={92} />
       <h1>Presidio Web</h1>
-      <p>Private PII detection, entirely in your browser.</p>
+      <p>Presidio, right in your browser.</p>
       <nav aria-label="Primary navigation">
         <Link href="/docs/">Documentation</Link>
         <span aria-hidden="true">·</span>

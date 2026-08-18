@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 
 export default function Documentation() {
   return (
     <main className="docs-page">
-      <nav className="docs-nav"><Link href="/">Presidio Web</Link><Link href="/demo/">Open demo →</Link></nav>
+      <nav className="docs-nav"><Link className="brand-link" href="/"><BrandMark size={28} />Presidio Web</Link><Link href="/demo/">Open demo →</Link></nav>
       <header>
         <p className="eyebrow">DOCUMENTATION</p>
         <h1>Browser-native PII detection.</h1>
