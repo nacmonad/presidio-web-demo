@@ -11,6 +11,10 @@ export default function Home() {
         <Link href="/docs/">Documentation</Link>
         <span aria-hidden="true">·</span>
         <Link href="/demo/">Demo</Link>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/nacmonad/presidio-web" target="_blank" rel="noreferrer">GitHub</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://www.npmjs.com/package/presidio-web" target="_blank" rel="noreferrer">npm</a>
       </nav>
     </main>
   );

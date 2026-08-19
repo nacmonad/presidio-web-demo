@@ -56,8 +56,9 @@ const findings = analyzer.analyze(
 
       <section>
         <h2>Source and further reading</h2>
-        <p><a href="https://github.com/nacmonad/presidio-web-demo">Demo source on GitHub</a></p>
+        <p><a href="https://github.com/nacmonad/presidio-web">presidio-web source on GitHub</a></p>
         <p><a href="https://www.npmjs.com/package/presidio-web">presidio-web on npm</a></p>
+        <p><a href="https://github.com/nacmonad/presidio-web-demo">Demo source on GitHub</a></p>
       </section>
     </main>
   );

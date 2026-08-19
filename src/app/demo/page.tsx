@@ -231,7 +231,14 @@ export default function Home() {
         </article>
       </section>
 
-      <footer><strong>presidio-web</strong><span>Hybrid Presidio + GLiNER analysis runs entirely inside a dedicated browser worker.</span></footer>
+      <footer>
+        <strong>presidio-web</strong>
+        <span>Hybrid Presidio + GLiNER analysis runs entirely inside a dedicated browser worker.</span>
+        <nav aria-label="Project links">
+          <a href="https://github.com/nacmonad/presidio-web" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://www.npmjs.com/package/presidio-web" target="_blank" rel="noreferrer">npm</a>
+        </nav>
+      </footer>
     </main>
   );
 }
